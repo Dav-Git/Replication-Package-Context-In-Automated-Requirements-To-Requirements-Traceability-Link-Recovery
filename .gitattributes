@@ -11,3 +11,6 @@
 03_Code/LiSSA/cache-r2r/dronology-ensemble filter=lfs diff=lfs merge=lfs -text
 03_Code/LiSSA/cache-r2r/GANNT-ensemble filter=lfs diff=lfs merge=lfs -text
 03_Code/LiSSA/cache-r2r/ModisDataset-ensemble filter=lfs diff=lfs merge=lfs -text
+03_Code/LiSSA/cache/**/*.json filter=lfs diff=lfs merge=lfs -text
+03_Code/LiSSA/cache-ext-tl/**/*.json filter=lfs diff=lfs merge=lfs -text
+03_Code/LiSSA/cache-r2r/**/*.json filter=lfs diff=lfs merge=lfs -text
