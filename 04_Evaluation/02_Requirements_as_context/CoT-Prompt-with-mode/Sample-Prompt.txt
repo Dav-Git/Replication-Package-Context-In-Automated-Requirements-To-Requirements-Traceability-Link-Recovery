@@ -1,0 +1,27 @@
+Below are artifacts from the same software system. Is there a traceability link between (a) and (b)?
+Consider that the numbered TARGET requirement also exist in the same software system.
+Give your reasoning, then answer with 'yes' or 'no' enclosed in <trace></trace>.
+
+(a) requirement: ```Coordinate system conversion
+
+When requested  the _CoordinateSystem_ shall transform coordinates to alternate formats.```
+(b) requirement: ```Coordinate system conversion from p-vector
+
+When requested  coordinates shall be transformed from p-vectors to the default representation.```
+
+Context:
+(1): ```Coordinate system conversion to n-vector
+
+When requested  the _CoordinateSystem_ shall transform coordinates transformed from the default representation to n-vectors.```
+(2): ```Coordinate system conversion to p-vector
+
+When requested  the _CoordinateSystem_ shall be transform coordinates from the default representation to p-vectors.```
+(3): ```Coordinate system conversion from n-vector
+
+When requested  coordinates shall be transformed from n-vectors to the default representation.```
+(4): ```Default coordinate system
+
+The default coordinate representation shall use LLA (longitude  latitude  altitude) format.```
+(5): ```Forward commands to UAV
+
+The _GCS_ shall transform commands into a vehicle specific format.```

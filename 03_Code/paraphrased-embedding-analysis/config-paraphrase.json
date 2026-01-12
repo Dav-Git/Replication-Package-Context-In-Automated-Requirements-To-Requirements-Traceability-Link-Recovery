@@ -1,0 +1,35 @@
+
+{
+  "cache_dir": "./cache/CM1-NASA-low-paraphrase",
+
+  "gold_standard_configuration": {
+    "path": "datasets/CM1-NASA/answer.csv",
+    "hasHeader": "true"
+  },
+
+  "source_artifact_provider" : {
+    "name" : "text",
+    "args" : {
+      "artifact_type" : "requirement",
+      "path" : "datasets/CM1-NASA/low"
+    }
+  },
+  "source_preprocessor" : {
+    "name" : "paraphrase_openai",
+    "args" : {
+      "model": "o4-mini-2025-04-16",
+      "temperature": 1
+    }
+  },
+  "embedding_creator" : {
+    "name" : "openai",
+    "args" : {
+      "model": "text-embedding-3-large",
+      "paraphrasing": false
+    }
+  },
+  "source_store" : {
+    "name" : "custom",
+    "args" : { }
+  }
+}

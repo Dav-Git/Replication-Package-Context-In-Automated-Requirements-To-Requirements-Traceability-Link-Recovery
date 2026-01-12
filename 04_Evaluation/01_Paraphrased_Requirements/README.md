@@ -1,0 +1,2 @@
+The [paraphrase-gpt-4o](./paraphrase-gpt-4o/) directory contains all results obtained when using gpt-4o as the paraphrasing model. \ 
+The [paraphrase-o4-mini](./paraphrase-o4-mibi/) directory contains all results obtained when using o4-mini as the paraphrasing model. \ 

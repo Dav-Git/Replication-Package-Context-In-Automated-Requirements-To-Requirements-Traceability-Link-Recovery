@@ -1,0 +1,314 @@
+/* Licensed under MIT 2025. */
+package edu.kit.kastel.sdq.lissa.ratlr;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.kit.kastel.sdq.lissa.ratlr.artifactprovider.ArtifactProvider;
+import edu.kit.kastel.sdq.lissa.ratlr.cache.CacheManager;
+import edu.kit.kastel.sdq.lissa.ratlr.classifier.Classifier;
+import edu.kit.kastel.sdq.lissa.ratlr.configuration.LissaConfiguration;
+import edu.kit.kastel.sdq.lissa.ratlr.context.ContextStore;
+import edu.kit.kastel.sdq.lissa.ratlr.elementstore.SourceElementStore;
+import edu.kit.kastel.sdq.lissa.ratlr.elementstore.TargetElementStore;
+import edu.kit.kastel.sdq.lissa.ratlr.embeddingcreator.EmbeddingCreator;
+import edu.kit.kastel.sdq.lissa.ratlr.knowledge.Artifact;
+import edu.kit.kastel.sdq.lissa.ratlr.knowledge.Element;
+import edu.kit.kastel.sdq.lissa.ratlr.knowledge.TraceLink;
+import edu.kit.kastel.sdq.lissa.ratlr.postprocessor.TraceLinkIdPostprocessor;
+import edu.kit.kastel.sdq.lissa.ratlr.preprocessor.Preprocessor;
+import edu.kit.kastel.sdq.lissa.ratlr.resultaggregator.ResultAggregator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Represents a single evaluation run of the LiSSA framework.
+ * This class manages the complete trace link analysis pipeline for a given lissaConfiguration,
+ * including:
+ * <ul>
+ *     <li>Artifact loading from source and target providers</li>
+ *     <li>Preprocessing of artifacts into elements</li>
+ *     <li>Embedding calculation for elements</li>
+ *     <li>Classification of potential trace links</li>
+ *     <li>Result aggregation and postprocessing</li>
+ *     <li>Statistics generation and result storage</li>
+ * </ul>
+ * <p>
+ * The pipeline uses a {@link edu.kit.kastel.sdq.lissa.ratlr.context.ContextStore} to share context objects
+ * between components such as artifact providers, preprocessors, embedding creators, classifiers, and aggregators.
+ * </p>
+ *
+ * The pipeline follows these steps:
+ * <ol>
+ *     <li>Load artifacts from configured providers</li>
+ *     <li>Preprocess artifacts into elements</li>
+ *     <li>Calculate embeddings for elements</li>
+ *     <li>Build element stores for efficient access</li>
+ *     <li>Classify potential trace links</li>
+ *     <li>Aggregate results into final trace links</li>
+ *     <li>Postprocess trace link IDs</li>
+ *     <li>Generate and save statistics</li>
+ * </ol>
+ */
+public class Evaluation {
+
+    private static final Logger logger = LoggerFactory.getLogger(Evaluation.class);
+    private final Path configFile;
+
+    private final LissaConfiguration lissaConfiguration;
+
+    private ContextStore contextStore;
+
+    /** Provider for source artifacts */
+    private ArtifactProvider sourceArtifactProvider;
+    /** Provider for target artifacts */
+    private ArtifactProvider targetArtifactProvider;
+    /** Preprocessor for source artifacts */
+    private Preprocessor sourcePreprocessor;
+    /** Preprocessor for target artifacts */
+    private Preprocessor targetPreprocessor;
+    /** Creator for element embeddings */
+    private EmbeddingCreator embeddingCreator;
+    /** Store for source elements */
+    private SourceElementStore sourceStore;
+    /** Store for target elements */
+    private TargetElementStore targetStore;
+    /** Classifier for trace link analysis */
+    private Classifier classifier;
+    /** Aggregator for classification results */
+    private ResultAggregator aggregator;
+    /** Postprocessor for trace link IDs */
+    private TraceLinkIdPostprocessor traceLinkIdPostProcessor;
+
+    /**
+     * List of source elements processed in this evaluation.
+     */
+    private List<Element> sourceElements = new ArrayList<>();
+    /**
+     * List of target elements processed in this evaluation.
+     */
+    private List<Element> targetElements = new ArrayList<>();
+
+    /**
+     * Creates a new evaluation instance with the specified lissaConfiguration file.
+     * This constructor:
+     * <ol>
+     *     <li>Validates the lissaConfiguration file path</li>
+     *     <li>Loads and initializes the lissaConfiguration</li>
+     *     <li>Sets up all required components for the pipeline, sharing a {@link ContextStore}</li>
+     * </ol>
+     *
+     * @param configFile Path to the lissaConfiguration file
+     * @throws IOException If there are issues reading the lissaConfiguration file
+     * @throws NullPointerException If configFile is null
+     */
+    public Evaluation(Path configFile) throws IOException {
+        this.configFile = Objects.requireNonNull(configFile);
+        lissaConfiguration = new ObjectMapper().readValue(configFile.toFile(), LissaConfiguration.class);
+        setup();
+    }
+
+    /**
+     * Sets up the evaluation pipeline components.
+     * This method:
+     * <ol>
+     *     <li>Loads the lissaConfiguration from file</li>
+     *     <li>Initializes the cache manager</li>
+     *     <li>Creates artifact providers</li>
+     *     <li>Creates preprocessors</li>
+     *     <li>Creates embedding creator</li>
+     *     <li>Creates element stores</li>
+     *     <li>Creates classifier</li>
+     *     <li>Creates result aggregator</li>
+     *     <li>Creates trace link ID postprocessor</li>
+     * </ol>
+     *
+     * @throws IOException If there are issues reading the lissaConfiguration
+     */
+    private void setup() throws IOException {
+        CacheManager.setCacheDir(lissaConfiguration.cacheDir());
+
+        contextStore = new ContextStore(lissaConfiguration.contextConfigurations());
+
+        sourceArtifactProvider =
+                ArtifactProvider.createArtifactProvider(lissaConfiguration.sourceArtifactProvider(), contextStore);
+        targetArtifactProvider =
+                ArtifactProvider.createArtifactProvider(lissaConfiguration.targetArtifactProvider(), contextStore);
+
+        sourcePreprocessor = Preprocessor.createPreprocessor(lissaConfiguration.sourcePreprocessor(), contextStore);
+        targetPreprocessor = Preprocessor.createPreprocessor(lissaConfiguration.targetPreprocessor(), contextStore);
+
+        embeddingCreator = EmbeddingCreator.createEmbeddingCreator(lissaConfiguration.embeddingCreator(), contextStore);
+        sourceStore = new SourceElementStore(lissaConfiguration.sourceStore());
+        targetStore = new TargetElementStore(lissaConfiguration.targetStore());
+        classifier = lissaConfiguration.createClassifier(contextStore);
+        aggregator = ResultAggregator.createResultAggregator(lissaConfiguration.resultAggregator(), contextStore);
+
+        traceLinkIdPostProcessor = TraceLinkIdPostprocessor.createTraceLinkIdPostprocessor(
+                lissaConfiguration.traceLinkIdPostprocessor(), contextStore);
+
+        lissaConfiguration.serializeAndDestroyConfiguration();
+    }
+
+    /**
+     * Runs the complete trace link analysis pipeline.
+     * This method:
+     * <ol>
+     *     <li>Loads contexts</li>
+     *     <li>Loads artifacts from providers</li>
+     *     <li>Preprocesses artifacts into elements</li>
+     *     <li>Calculates embeddings for elements</li>
+     *     <li>Builds element stores</li>
+     *     <li>Classifies potential trace links</li>
+     *     <li>Aggregates results</li>
+     *     <li>Postprocesses trace link IDs</li>
+     *     <li>Generates and saves statistics</li>
+     * </ol>
+     *
+     * @return Set of identified trace links
+     */
+    public Set<TraceLink> run() {
+        logger.info("Loading contexts");
+        contextStore.loadContexts();
+
+        initializeSourceAndTargetStores();
+
+        logger.info("Classifying Tracelinks");
+        var llmResults = classifier.classify(sourceStore, targetStore);
+        var traceLinks = aggregator.aggregate(sourceElements, targetElements, llmResults);
+
+        logger.info("Postprocessing Tracelinks");
+        traceLinks = traceLinkIdPostProcessor.postprocess(traceLinks);
+
+        logger.info("Evaluating Results");
+        Statistics.generateStatistics(
+                traceLinks, configFile.toFile(), lissaConfiguration, getSourceArtifactCount(), getTargetArtifactCount());
+        Statistics.saveTraceLinks(traceLinks, configFile.toFile(), lissaConfiguration);
+
+        CacheManager.getDefaultInstance().flush();
+
+        return traceLinks;
+    }
+
+    /**
+     * Sets up the source and target element stores.
+     * This method:
+     * <ol>
+     *     <li>Loads artifacts from source and target providers</li>
+     *     <li>Preprocesses artifacts into elements</li>
+     *     <li>Calculates embeddings for elements</li>
+     *     <li>Builds element stores with elements and embeddings</li>
+     * </ol>
+     */
+    /*package-private*/ void initializeSourceAndTargetStores() {
+        logger.info("Loading artifacts");
+        List<Artifact> sourceArtifacts = sourceArtifactProvider.getArtifacts();
+        List<Artifact> targetArtifacts = targetArtifactProvider.getArtifacts();
+
+        logger.info("Preprocessing artifacts");
+        sourceElements = sourcePreprocessor.preprocess(sourceArtifacts);
+        targetElements = targetPreprocessor.preprocess(targetArtifacts);
+
+        logger.info("Calculating embeddings");
+        List<float[]> sourceEmbeddings = embeddingCreator.calculateEmbeddings(sourceElements);
+        List<float[]> targetEmbeddings = embeddingCreator.calculateEmbeddings(targetElements);
+
+        logger.info("Building element stores");
+        sourceStore.setup(sourceElements, sourceEmbeddings);
+        targetStore.setup(targetElements, targetEmbeddings);
+    }
+
+    /**
+     * Gets the number of source artifacts in this evaluation.
+     *
+     * @return Number of source artifacts
+     */
+    public int getSourceArtifactCount() {
+        return sourceArtifactProvider.getArtifacts().size();
+    }
+
+    /**
+     * Gets the number of target artifacts in this evaluation.
+     *
+     * @return Number of target artifacts
+     */
+    public int getTargetArtifactCount() {
+        return targetArtifactProvider.getArtifacts().size();
+    }
+
+    /**
+     * Gets the configuration for this evaluation.
+     *
+     * @return The configuration object
+     */
+    public LissaConfiguration getConfiguration() {
+        return lissaConfiguration;
+    }
+
+    /**
+     * Gets the source element store.
+     * <p>
+     * Note: The store is initialized after construction but will be empty
+     * until {@link #initializeSourceAndTargetStores()} is called.
+     * </p>
+     *
+     * @return The source element store
+     */
+    public SourceElementStore getSourceStore() {
+        return sourceStore;
+    }
+
+    /**
+     * Gets the target element store.
+     * <p>
+     * Note: The store is initialized after construction but will be empty
+     * until {@link #initializeSourceAndTargetStores()} is called.
+     * </p>
+     *
+     * @return The target element store
+     */
+    public TargetElementStore getTargetStore() {
+        return targetStore;
+    }
+
+    /**
+     * Gets the classifier used for trace link analysis.
+     * <p>
+     * Note: Available after construction completes.
+     * </p>
+     *
+     * @return The classifier
+     */
+    public Classifier getClassifier() {
+        return classifier;
+    }
+
+    /**
+     * Gets the result aggregator.
+     * <p>
+     * Note: Available after construction completes.
+     * </p>
+     *
+     * @return The result aggregator
+     */
+    public ResultAggregator getAggregator() {
+        return aggregator;
+    }
+
+    /**
+     * Gets the trace link ID postprocessor.
+     * <p>
+     * Note: Available after construction completes.
+     * </p>
+     *
+     * @return The trace link ID postprocessor
+     */
+    public TraceLinkIdPostprocessor getTraceLinkIdPostProcessor() {
+        return traceLinkIdPostProcessor;
+    }
+}

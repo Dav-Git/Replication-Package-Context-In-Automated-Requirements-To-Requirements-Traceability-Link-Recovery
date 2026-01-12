@@ -1,0 +1,66 @@
+{
+  "cache_dir": "./cache/GANNT",
+
+  "gold_standard_configuration": {
+    "path": "./datasets/GANNT/answer.csv",
+    "hasHeader": "true"
+  },
+
+  "source_artifact_provider" : {
+    "name" : "text",
+    "args" : {
+      "artifact_type" : "requirement",
+      "path" : "./datasets/GANNT/high"
+    }
+  },
+  "target_artifact_provider" : {
+    "name" : "text",
+    "args" : {
+      "artifact_type" : "requirement",
+      "path" : "./datasets/GANNT/low"
+    }
+  },
+  "source_preprocessor" : {
+    "name" : "artifact",
+    "args" : {}
+  },
+  "target_preprocessor": {
+    "name": "paraphrase_openai",
+    "args": {
+      "model": "gpt-4o-2024-08-06",
+      "superseed": "1337420",
+      "temperature": 1,
+      "count": 3
+    }
+  },
+  "embedding_creator" : {
+    "name" : "openai",
+    "args" : {
+      "model": "text-embedding-3-large"
+    }
+  },
+  "source_store" : {
+    "name" : "custom",
+    "args" : { }
+  },
+  "target_store" : {
+    "name" : "custom",
+    "args" : {
+      "max_results" : "4"
+    }
+  },
+  "classifier" : {
+    "name" : "reasoning_openai",
+    "args" : {
+      "model": "gpt-4o-2024-08-06"
+    }
+  },
+  "result_aggregator" : {
+    "name" : "any_connection",
+    "args" : {}
+  },
+  "tracelinkid_postprocessor" : {
+    "name" : "req2req",
+    "args" : {}
+  }
+}

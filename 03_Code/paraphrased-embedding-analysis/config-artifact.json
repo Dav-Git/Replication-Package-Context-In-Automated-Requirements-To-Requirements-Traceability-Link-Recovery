@@ -1,0 +1,32 @@
+
+{
+  "cache_dir": "./cache/GANNT",
+
+  "gold_standard_configuration": {
+    "path": "datasets/GANNT/answer.csv",
+    "hasHeader": "true"
+  },
+
+  "source_artifact_provider" : {
+    "name" : "text",
+    "args" : {
+      "artifact_type" : "requirement",
+      "path" : "datasets/GANNT/low"
+    }
+  },
+  "source_preprocessor" : {
+    "name" : "artifact",
+    "args" : {
+    }
+  },
+  "embedding_creator" : {
+    "name" : "openai",
+    "args" : {
+      "model": "text-embedding-3-large"
+    }
+  },
+  "source_store" : {
+    "name" : "custom",
+    "args" : { }
+  }
+}
